@@ -4,7 +4,8 @@
 from pprint import pprint
 import random
 
-GRID_SIZE = 5
+# Size of the playing field in units squared.
+GRID_SIZE = 6
 
 
 class Grid(object):
@@ -12,6 +13,8 @@ class Grid(object):
     def __init__(self, size):
         self.size = size
         self.gridState = []
+                
+        # Create Initial grid state 
         for row in range(size):
             row = []
             for column in range(size):
@@ -19,11 +22,16 @@ class Grid(object):
             self.gridState.append(row)
     
     def get_hidden_grid(self):
+        """ Method is used to hide enemy ships during the game.
+        """
+        # Make a copy of the grid.
         hiddenGridState = list(self.gridState)
+        
+        # Change all the ship cells to 0 to empty cells to hide them.
         for rowIndex, row in enumerate(self.gridState):
             for columnIndex, column in enumerate(row):
                 if column == 1:
-                    hiddenGridState[rowIndex][columnIndex] = 2
+                    hiddenGridState[rowIndex][columnIndex] = 0
         return hiddenGridState
 
 
@@ -177,11 +185,13 @@ def get_random_ship_placement_location(grid, shipLength):
     return sectionLocationTupleList
 
 def populate_grid(grid):
+    # Dictionary of ship type to length and number per player
     shipSizeDic = {#'Aircraft Carrier': (5, 1),
-                   #'BattleShip': (4, 1),
+                   #'Battleship': (4, 1),
                    #'Cruiser': (3, 1),
                    #'Destroyer': (2, 2),
-                   'Submarine': (1, 2)}
+                   #'Submarine': (1, 2),
+                   'DebugShip': (4, 2)}
     shipObjectList = []
     for shipType in shipSizeDic:
         size, number = shipSizeDic[shipType]
@@ -193,16 +203,52 @@ def populate_grid(grid):
     return shipObjectList
 
 
-def random_ai_move(previousAIMovesTupleList):
+def random_ai_move(grid):
         row = random.randrange(GRID_SIZE)
         column = random.randrange(GRID_SIZE)
-        aiMoveTuple = tuple((row, column))
-        while aiMoveTuple in previousAIMovesTupleList:
+        aiMoveTuple = (row, column)
+        while not is_valid_move(grid, aiMoveTuple):
             row = random.randrange(GRID_SIZE)
             column = random.randrange(GRID_SIZE)
-            aiMoveTuple = tuple((row, column))
+            aiMoveTuple = (row, column)
         return aiMoveTuple
 
+        
+def is_valid_move(grid, moveTuple):
+    row, column = moveTuple
+    # Check if point is outside of grid index range.
+    if row < 0 or row > grid.size - 1:
+        return False
+    if column < 0 or column > grid.size - 1:
+        return False
+        
+    # Check if point has already been attacked.
+    if grid.gridState[row][column] == 2 or grid.gridState[row][column] == 3:
+        return False
+    
+    # All checks have passed. Move is valid.
+    return True
+
+def smart_ai_move(grid, origHitTuple):
+    row, column = origHitTuple
+    
+    if is_valid_move(grid, (row + 1, column)):
+        row += 1
+    elif is_valid_move(grid, (row - 1, column)):
+        row -= 1    
+    elif is_valid_move(grid, (row, column + 1)):
+        column += 1     
+    elif is_valid_move(grid, (row, column - 1)):
+        column -= 1    
+    else:
+        print('No Valid Moves found in search pattern. Switching to random')
+        smart_ai_move.isTargetMode = True
+        return random_ai_move(grid)
+ 
+           
+    aiMoveTuple = (row, column)    
+    return aiMoveTuple
+    
 def main():
 
     # Create playing fields for computer and AI.
@@ -276,5 +322,50 @@ def main():
 
     print('Game is finished!')
 
-main ()
-
+def prototype_main():
+    humanGrid = Grid(GRID_SIZE)
+    humanShipList = populate_grid(humanGrid)
+    pprint(humanGrid.gridState)
+    previousAIMovesTupleList = []
+    smart_ai_move.isTargetMode = False
+    
+    while len(humanShipList) != 0:
+        
+        if smart_ai_move.isTargetMode:
+            print('Changing to target search mode')
+            aiMoveTuple = smart_ai_move(humanGrid, origHitTuple)
+        else:
+            # Get a random move from AI.
+            aiMoveTuple = random_ai_move(humanGrid)
+            
+        previousAIMovesTupleList.append(aiMoveTuple)
+        # Check if there was a hit
+        for ship in humanShipList:
+            if aiMoveTuple in ship.sectionLocationList:
+                smart_ai_move.isTargetMode = True
+                row, column = aiMoveTuple
+                origHitTuple = aiMoveTuple
+                print('AI, there was a hit!')
+                print(aiMoveTuple)
+                #print(ship.name, ship.sectionLocationList)
+                ship.take_damage(aiMoveTuple)
+                if not ship.isAlive:
+                    print('Nice! You sunk the', ship.name)
+                    humanShipList.remove(ship)
+                    smart_ai_move.isTargetMode = False
+                    smart_ai_move.variationPattern = 0
+                    
+                humanGrid.gridState[row][column] = 2
+                break
+                
+        else:
+            print('AI Missed!')
+            row, column = aiMoveTuple
+            humanGrid.gridState[row][column] = 3
+                        
+        print('Human Grid:')
+        print('AI move was:', aiMoveTuple)
+        pprint(humanGrid.gridState)
+        input()
+ 
+prototype_main()    
