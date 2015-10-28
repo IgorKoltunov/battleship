@@ -9,12 +9,13 @@ GRID_SIZE = 6
 
 
 class Grid(object):
-    """ Class for Game Grid."""
+    """ Class for keeping track of player's grid state."""
     def __init__(self, size):
         self.size = size
         self.gridState = []
+        self.aliveShipObjectList = []
                 
-        # Create Initial grid state 
+        # Create Initial empty grid state. 
         for row in range(size):
             row = []
             for column in range(size):
@@ -27,7 +28,7 @@ class Grid(object):
         # Make a copy of the grid.
         hiddenGridState = list(self.gridState)
         
-        # Change all the ship cells to 0 to empty cells to hide them.
+        # Change all the ship cells to 0 to hide ship locations.
         for rowIndex, row in enumerate(self.gridState):
             for columnIndex, column in enumerate(row):
                 if column == 1:
@@ -36,7 +37,7 @@ class Grid(object):
 
 
 class Ship(object):
-    """ Class that stores ship state"""
+    """ Class that stores ship state, location and damage taken."""
     def __init__(self, name, sectionLocationTupleList):
         self.name = name
         self.sectionLocationList = sectionLocationTupleList
@@ -44,7 +45,7 @@ class Ship(object):
         self.isAlive = True
     
     def take_damage(self, gridLocation):
-        # Catch dead ship case
+        # Catch dead ship case.
         if not self.isAlive:
             print('Error: Cant take damage. Ship is not alive.')
             return None
@@ -52,12 +53,12 @@ class Ship(object):
         if gridLocation in self.sectionLocationList:
             self.damagedSectionList.append(gridLocation)
 
-        # Catch wrong grid location
+        # Catch wrong grid location.
         else:
-            print('Error: Cant take damage as Ship is not on this grid location')
+            print('Error: Cant take damage as Ship is not at this grid location')
             return None
 
-        # Set ship as dead if all sections are destroyed
+        # Mark ship as dead if all sections are destroyed.
         if set(self.damagedSectionList) == set(self.sectionLocationList):
             self.isAlive = False
 
@@ -132,11 +133,30 @@ def is_valid_placement(grid, row, column):
     # All checks have passed. Location is valid.
     return True
 
+    
+def is_valid_move(grid, moveTuple):
+    """ Check if a particular move would be valid."""
+    row, column = moveTuple
+    # Check if move is outside of grid index range.
+    if row < 0 or row > grid.size - 1:
+        return False
+    if column < 0 or column > grid.size - 1:
+        return False
+        
+    # Check if point has already been attacked.
+    if grid.gridState[row][column] == 2 or grid.gridState[row][column] == 3:
+        return False
+    
+    # All checks have passed. Move is valid.
+    return True    
+
 
 def get_random_ship_placement_location(grid, shipLength):
-    """ Find random but valid ship placement location.
+    """ Find random but valid placement location for a ship.
     """
+    # Counter to guard against infinite loops.
     tries = 0
+    
     sectionLocationTupleList = []
     
     while len(sectionLocationTupleList) != shipLength and tries != 100000:
@@ -148,8 +168,7 @@ def get_random_ship_placement_location(grid, shipLength):
         # Start over if there is no valid placement.
         if not is_valid_placement(grid, row, column):
             continue
-        sectionLocationTuple = tuple((row, column))
-        sectionLocationTupleList.append(sectionLocationTuple)
+        sectionLocationTupleList.append((row, column))
         
         # Continue adding sections if needed.
         if shipLength > 1:
@@ -167,9 +186,8 @@ def get_random_ship_placement_location(grid, shipLength):
                     column -= 1        
                 
                 if is_valid_placement(grid, row, column):
-                    
-                    sectionLocationTuple = tuple((row, column))
-                    sectionLocationTupleList.append(sectionLocationTuple)
+                                        
+                    sectionLocationTupleList.append((row, column))
                 # If no valid placement for section, exit loop.
                 else:
                     break
@@ -184,50 +202,43 @@ def get_random_ship_placement_location(grid, shipLength):
         return []
     return sectionLocationTupleList
 
+    
 def populate_grid(grid):
-    # Dictionary of ship type to length and number per player
+    """ Populate a given grid with ships.
+    """
+    # Dictionary of ship type to length and number per player.
     shipSizeDic = {#'Aircraft Carrier': (5, 1),
                    #'Battleship': (4, 1),
                    #'Cruiser': (3, 1),
                    #'Destroyer': (2, 2),
                    #'Submarine': (1, 2),
                    'DebugShip': (4, 2)}
-    shipObjectList = []
+    
+    # Place ships on the grid in random locations.
     for shipType in shipSizeDic:
         size, number = shipSizeDic[shipType]
         for i in range(number):
             shipObject = Ship(shipType, get_random_ship_placement_location(grid, size))
-            shipObjectList.append(shipObject)
+            grid.aliveShipObjectList.append(shipObject)
             for row, column in shipObject.sectionLocationList:
                 grid.gridState[row][column] = 1
-    return shipObjectList
 
 
 def random_ai_move(grid):
+    """ Return a random move on a given grid.
+    """
+    row = random.randrange(GRID_SIZE)
+    column = random.randrange(GRID_SIZE)
+    aiMoveTuple = (row, column)
+    
+    # Look for a valid move if first random location is invalid. 
+    while not is_valid_move(grid, aiMoveTuple):
         row = random.randrange(GRID_SIZE)
         column = random.randrange(GRID_SIZE)
         aiMoveTuple = (row, column)
-        while not is_valid_move(grid, aiMoveTuple):
-            row = random.randrange(GRID_SIZE)
-            column = random.randrange(GRID_SIZE)
-            aiMoveTuple = (row, column)
-        return aiMoveTuple
-
-        
-def is_valid_move(grid, moveTuple):
-    row, column = moveTuple
-    # Check if point is outside of grid index range.
-    if row < 0 or row > grid.size - 1:
-        return False
-    if column < 0 or column > grid.size - 1:
-        return False
-        
-    # Check if point has already been attacked.
-    if grid.gridState[row][column] == 2 or grid.gridState[row][column] == 3:
-        return False
     
-    # All checks have passed. Move is valid.
-    return True
+    return aiMoveTuple    
+
 
 def smart_ai_move(grid, origHitTuple):
     row, column = origHitTuple
@@ -244,12 +255,53 @@ def smart_ai_move(grid, origHitTuple):
         print('No Valid Moves found in search pattern. Switching to random')
         smart_ai_move.isTargetMode = True
         return random_ai_move(grid)
- 
-           
+            
     aiMoveTuple = (row, column)    
     return aiMoveTuple
+
+def ai_move(grid):
+    # Since this function is going to be part of a loop, setting these
+    # variables as global so their state is remembered for future uses
+    # of the function.
+    global origHitTuple
+    global isTargetMode
     
-def main():
+    # If isTargetMode has not been defined yet, assuming it is False.
+    if 'isTargetMode' not in globals():
+        isTargetMode = False
+    
+    if isTargetMode:
+        print('Target mode pattern')
+        aiMoveTuple = smart_ai_move(grid, origHitTuple)
+    else:
+        # Get a random move from AI.
+        aiMoveTuple = random_ai_move(grid)
+    
+    # Check if there was a hit
+    for ship in grid.aliveShipObjectList:
+        if aiMoveTuple in ship.sectionLocationList:
+            isTargetMode = True
+            row, column = aiMoveTuple
+            origHitTuple = aiMoveTuple
+            print('AI, there was a hit!')
+            print(aiMoveTuple)
+            #print(ship.name, ship.sectionLocationList)
+            ship.take_damage(aiMoveTuple)
+            if not ship.isAlive:
+                print('Nice! You sunk the', ship.name)
+                grid.aliveShipObjectList.remove(ship)
+                isTargetMode = False
+                smart_ai_move.variationPattern = 0
+                
+            grid.gridState[row][column] = 2
+            break
+            
+    else:
+        print('AI Missed!')
+        row, column = aiMoveTuple
+        grid.gridState[row][column] = 3
+    
+    return aiMoveTuple  
 
     # Create playing fields for computer and AI.
     humanGrid = Grid(GRID_SIZE)
@@ -266,7 +318,7 @@ def main():
     pprint(aiGrid.gridState)
 
 
-    previousAIMovesTupleList = []
+
     # Keep game going while there are AI and Human ships alive.
     while len(aiShipList) != 0 and len(humanShipList) != 0:
         isHit = False
@@ -324,45 +376,11 @@ def main():
 
 def prototype_main():
     humanGrid = Grid(GRID_SIZE)
-    humanShipList = populate_grid(humanGrid)
+    populate_grid(humanGrid)
     pprint(humanGrid.gridState)
-    previousAIMovesTupleList = []
-    smart_ai_move.isTargetMode = False
     
-    while len(humanShipList) != 0:
-        
-        if smart_ai_move.isTargetMode:
-            print('Changing to target search mode')
-            aiMoveTuple = smart_ai_move(humanGrid, origHitTuple)
-        else:
-            # Get a random move from AI.
-            aiMoveTuple = random_ai_move(humanGrid)
-            
-        previousAIMovesTupleList.append(aiMoveTuple)
-        # Check if there was a hit
-        for ship in humanShipList:
-            if aiMoveTuple in ship.sectionLocationList:
-                smart_ai_move.isTargetMode = True
-                row, column = aiMoveTuple
-                origHitTuple = aiMoveTuple
-                print('AI, there was a hit!')
-                print(aiMoveTuple)
-                #print(ship.name, ship.sectionLocationList)
-                ship.take_damage(aiMoveTuple)
-                if not ship.isAlive:
-                    print('Nice! You sunk the', ship.name)
-                    humanShipList.remove(ship)
-                    smart_ai_move.isTargetMode = False
-                    smart_ai_move.variationPattern = 0
-                    
-                humanGrid.gridState[row][column] = 2
-                break
-                
-        else:
-            print('AI Missed!')
-            row, column = aiMoveTuple
-            humanGrid.gridState[row][column] = 3
-                        
+    while len(humanGrid.aliveShipObjectList) != 0:
+        aiMoveTuple = ai_move(humanGrid)                   
         print('Human Grid:')
         print('AI move was:', aiMoveTuple)
         pprint(humanGrid.gridState)
