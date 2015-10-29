@@ -5,11 +5,12 @@ from pprint import pprint
 import random
 
 # Size of the playing field in units squared.
-GRID_SIZE = 6
+GRID_SIZE = 8
 
 
 class Grid(object):
-    """ Class for keeping track of player's grid state."""
+    """ Class for keeping track of player's grid state.
+    """
     def __init__(self, size):
         self.size = size
         self.gridState = []
@@ -37,7 +38,8 @@ class Grid(object):
 
 
 class Ship(object):
-    """ Class that stores ship state, location and damage taken."""
+    """ Class that stores ship state, location and damage taken.
+    """
     def __init__(self, name, sectionLocationTupleList):
         self.name = name
         self.sectionLocationList = sectionLocationTupleList
@@ -135,7 +137,8 @@ def is_valid_placement(grid, row, column):
 
     
 def is_valid_move(grid, moveTuple):
-    """ Check if a particular move would be valid."""
+    """ Check if a particular move would be valid.
+    """
     row, column = moveTuple
     # Check if move is outside of grid index range.
     if row < 0 or row > grid.size - 1:
@@ -253,7 +256,7 @@ def smart_ai_move(grid, origHitTuple):
         column -= 1    
     else:
         print('No Valid Moves found in search pattern. Switching to random')
-        smart_ai_move.isTargetMode = True
+        isTargetMode = False
         return random_ai_move(grid)
             
     aiMoveTuple = (row, column)    
@@ -303,78 +306,7 @@ def ai_move(grid):
     
     return aiMoveTuple  
 
-    # Create playing fields for computer and AI.
-    humanGrid = Grid(GRID_SIZE)
-    aiGrid = Grid(GRID_SIZE)
-
-    # Create ships and populate grids.
-    humanShipList = populate_grid(humanGrid)
-    aiShipList = populate_grid(aiGrid)
-
-    # Debug:
-    print('Starting Grid State Human')
-    pprint(humanGrid.gridState)
-    print('Starting Grid State AI')
-    pprint(aiGrid.gridState)
-
-
-
-    # Keep game going while there are AI and Human ships alive.
-    while len(aiShipList) != 0 and len(humanShipList) != 0:
-        isHit = False
-        # Get a move from human
-        row = int(input('Give a row number (0-9): '))
-        column = int(input('Give a column number (0-9): '))
-        humanMoveTuple = tuple((row, column))
-
-        # Check if there was a hit
-        for ship in aiShipList:
-            if humanMoveTuple in ship.sectionLocationList:
-                print('Human, there was a hit!')
-                isHit = True
-                print(humanMoveTuple)
-                print(ship.name, ship.sectionLocationList)
-                ship.take_damage(humanMoveTuple)
-                if not ship.isAlive:
-                    print('Nice! You sunk the', ship.name)
-                    aiShipList.remove(ship)
-                aiGrid.gridState[row][column] = 2
-        if not isHit:
-            print('Human Missed!')
-            aiGrid.gridState[row][column] = 3
-        print('AI Grid:')
-        print('Human move was:', humanMoveTuple)
-        pprint(aiGrid.gridState)
-
-        isHit = False
-         # Get a move from AI.
-        aiMoveTuple = random_ai_move(previousAIMovesTupleList)
-        previousAIMovesTupleList.append(aiMoveTuple)
-
-        # Check if there was a hit
-        for ship in humanShipList:
-            if aiMoveTuple in ship.sectionLocationList:
-                row, column = aiMoveTuple
-                print('AI, there was a hit!')
-                isHit = True
-                print(aiMoveTuple)
-                print(ship.name, ship.sectionLocationList)
-                ship.take_damage(aiMoveTuple)
-                if not ship.isAlive:
-                    print('Nice! You sunk the', ship.name)
-                    humanShipList.remove(ship)
-                humanGrid.gridState[row][column] = 2
-        if not isHit:
-            print('AI Missed!')
-            row, column = aiMoveTuple
-            humanGrid.gridState[row][column] = 3
-        print('Human Grid:')
-        print('AI move was:', aiMoveTuple)
-        pprint(humanGrid.gridState)
-
-    print('Game is finished!')
-
-def prototype_main():
+def main():
     humanGrid = Grid(GRID_SIZE)
     populate_grid(humanGrid)
     pprint(humanGrid.gridState)
@@ -386,4 +318,4 @@ def prototype_main():
         pprint(humanGrid.gridState)
         input()
  
-prototype_main()    
+main()    
