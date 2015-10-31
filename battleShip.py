@@ -23,7 +23,6 @@ class Grid(object):
                 row.append(0)
             self.gridState.append(row)
 
-            
     def populate_grid(self):  
         """ Populate the grid with ships.
         """
@@ -44,19 +43,18 @@ class Grid(object):
                 for row, column in shipObject.sectionLocationList:
                     self.gridState[row][column] = 1 
 
+    def get_hidden_grid(self):
+        """ Method is used to hide enemy ships during the game.
+        """
+        # Make a copy of the grid.
+        hiddenGridState = list(self.gridState)
 
-        def get_hidden_grid(self):
-            """ Method is used to hide enemy ships during the game.
-            """
-            # Make a copy of the grid.
-            hiddenGridState = list(self.gridState)
-            
-            # Change all the ship cells to 0 to hide ship locations.
-            for rowIndex, row in enumerate(self.gridState):
-                for columnIndex, column in enumerate(row):
-                    if column == 1:
-                        hiddenGridState[rowIndex][columnIndex] = 0
-            return hiddenGridState                    
+        # Change all the ship cells to 0 to hide ship locations.
+        for rowIndex, row in enumerate(self.gridState):
+            for columnIndex, column in enumerate(row):
+                if column == 1:
+                    hiddenGridState[rowIndex][columnIndex] = 0
+        return hiddenGridState
                     
                     
 class Ship(object):
@@ -84,6 +82,7 @@ class Ship(object):
         if set(self.damagedSectionList) == set(self.sectionLocationList):
             self.isAlive = False
 
+
 class AIMind(object):            
     """ Class that handles AI move state and logic.
     """
@@ -110,7 +109,6 @@ class AIMind(object):
         
         return aiMoveTuple     
 
-        
     def provide_pattern_move(self, hitTuple):
         """ Function generates moves adjacent to the last known hit.
         """
@@ -136,8 +134,7 @@ class AIMind(object):
         row, column = prevAIMoveTuple
         origRow, origColumn = self.origHitTuple
         subRow, subColumn = self.subsequentHitTuple
-      
-        
+
         # Determine orientation of the ship.
         if not self.orientation:
             if origRow - subRow == 0:
@@ -158,11 +155,10 @@ class AIMind(object):
                     origColumn -= 1
                     self.origHitTuple = (origRow, origColumn)
                     aiMoveTuple = self.origHitTuple
-                    
-               
-        if self.orientation == 'vertical':
+
+        elif self.orientation == 'vertical':
             if is_valid_move(self.grid, (subRow + 1, origColumn)) and self.grid.gridState[row][column] != 3:
-                aiMoveTuple = (subRow + 1, origColumn)     
+                aiMoveTuple = (subRow + 1, origColumn)
             else:
                 print('origRow -=1 Mode')
                 origRow -= 1
@@ -173,8 +169,9 @@ class AIMind(object):
                     origRow -= 1
                     self.origHitTuple = (origRow, origColumn)
                     aiMoveTuple = self.origHitTuple
-                
+
         return aiMoveTuple
+
         
 def is_valid_placement(grid, row, column):
     """ Function checks if a particular point on a grid is valid for
@@ -264,6 +261,7 @@ def is_valid_move(grid, moveTuple):
     # All checks have passed. Move is valid.
     return True    
 
+
 def is_adjacent_to_known_ship(grid, moveTuple):
     row, column = moveTuple
     
@@ -321,6 +319,7 @@ def is_adjacent_to_known_ship(grid, moveTuple):
     
     # All checks have passed. Location is not adjacent to any ships
     return False
+
 
 def get_random_ship_placement_location(grid, shipLength):
     """ Find random but valid placement location for a ship.
@@ -386,8 +385,7 @@ def main():
     
     # Print Starting Human grid state.
     pprint(humanGrid.gridState)
-   
-        
+           
     while len(humanGrid.aliveShipObjectList) != 0:
         if aiBrain.isTargetMode and not aiBrain.isSecondHit:
             print('Getting a pattern move from aiBrain')
