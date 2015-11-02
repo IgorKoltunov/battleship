@@ -1,4 +1,4 @@
-""" You sunk my Battle Ship!
+""" Classic game of Battleship against the AI.
 """
 
 from pprint import pprint
@@ -16,7 +16,7 @@ class Grid(object):
         self.gridState = []
         self.aliveShipObjectList = []
                 
-        # Create Initial empty grid state. 
+        # Create initial empty grid state. 
         for row in range(size):
             row = []
             for column in range(size):
@@ -49,7 +49,7 @@ class Grid(object):
         # Make a copy of the grid.
         hiddenGridState = list(self.gridState)
 
-        # Change all the ship cells to 0 to hide ship locations.
+        # Change all the ship cells to 0 for printing to hide ship locations.
         for rowIndex, row in enumerate(self.gridState):
             for columnIndex, column in enumerate(row):
                 if column == 1:
@@ -67,7 +67,9 @@ class Ship(object):
         self.isAlive = True
     
     def take_damage(self, gridLocation):
-        # Catch dead ship case.
+        """ Method for keeping track of damage to the ship.
+        """
+        # Catch a dead ship case.
         if not self.isAlive:
             print('Error: Cant take damage. Ship is not alive.')            
 
@@ -76,7 +78,7 @@ class Ship(object):
 
         # Catch wrong grid location.
         else:
-            print('Error: Cant take damage as Ship is not at this grid location')
+            print('Error: Cant take damage as Ship is not at this grid location.')
 
         # Mark ship as dead if all sections are destroyed.
         if set(self.damagedSectionList) == set(self.sectionLocationList):
@@ -84,7 +86,7 @@ class Ship(object):
 
 
 class AIMind(object):            
-    """ Class that handles AI move state and logic.
+    """ Class that handles AI move logic.
     """
     def __init__(self, grid):    
         self.grid = grid
@@ -102,7 +104,7 @@ class AIMind(object):
         aiMoveTuple = (row, column)
 
         # Look for a valid move if first random location is invalid. 
-        while not is_valid_move(self.grid, aiMoveTuple) or is_adjacent_to_known_ship(self.grid, aiMoveTuple):
+        while not is_valid_move(self.grid, aiMoveTuple) or is_move_adjacent_to_known_ship(self.grid, aiMoveTuple):
             row = random.randrange(GRID_SIZE)
             column = random.randrange(GRID_SIZE)
             aiMoveTuple = (row, column)
@@ -110,10 +112,11 @@ class AIMind(object):
         return aiMoveTuple     
 
     def provide_pattern_move(self, hitTuple):
-        """ Function generates moves adjacent to the last known hit.
+        """ Method generates moves adjacent to the last known hit.
         """
         row, column = hitTuple
         
+        # Make hits to cells adjacent to last known hit.
         if is_valid_move(self.grid, (row + 1, column)):
             row += 1
         elif is_valid_move(self.grid, (row - 1, column)):
@@ -123,6 +126,8 @@ class AIMind(object):
         elif is_valid_move(self.grid, (row, column - 1)):
             column -= 1    
         else:
+            # If there are no valid moves in adjacent cells, fall back
+            # to random hit logic.
             print('No Valid Moves found in search pattern. Switching to random')
             self.isTargetMode = False
             return self.provide_random_move()
@@ -130,7 +135,10 @@ class AIMind(object):
         aiMoveTuple = (row, column)    
         return aiMoveTuple        
 
-    def provide_targeted_move(self, prevAIMoveTuple): 
+    def provide_targeted_move(self, prevAIMoveTuple):
+        """ After there have been multiple hits on same ship,
+            this method will provide moves along that axis.
+        """
         row, column = prevAIMoveTuple
         origRow, origColumn = self.origHitTuple
         subRow, subColumn = self.subsequentHitTuple
@@ -143,28 +151,31 @@ class AIMind(object):
                 self.orientation = 'vertical'
 
         if self.orientation == 'horizontal':
+            # Keep attacking adjacent cells on same axis as long as last move was not a miss.
             if is_valid_move(self.grid, (origRow, subColumn + 1)) and self.grid.gridState[row][column] != 3:
                 aiMoveTuple = (origRow, subColumn + 1)
+            
+            # Attack cells in different direction starting from
+            # original hit point.
             else:
-                print('origColumn -= 1 Mode')
                 origColumn -= 1
                 self.origHitTuple = (origRow, origColumn)
                 aiMoveTuple = self.origHitTuple
-                # TODO: Can this be avoided?
+                    
                 while not is_valid_move(self.grid, aiMoveTuple):
                     origColumn -= 1
                     self.origHitTuple = (origRow, origColumn)
                     aiMoveTuple = self.origHitTuple
-
+                    
+        # Same logic as above but for vertical ship orientation.
         elif self.orientation == 'vertical':
             if is_valid_move(self.grid, (subRow + 1, origColumn)) and self.grid.gridState[row][column] != 3:
                 aiMoveTuple = (subRow + 1, origColumn)
             else:
-                print('origRow -=1 Mode')
                 origRow -= 1
                 self.origHitTuple = (origRow, origColumn)
                 aiMoveTuple = self.origHitTuple
-                # TODO: Can this be avoided?
+
                 while not is_valid_move(self.grid, aiMoveTuple):
                     origRow -= 1
                     self.origHitTuple = (origRow, origColumn)
@@ -172,7 +183,7 @@ class AIMind(object):
 
         return aiMoveTuple
 
-        
+
 def is_valid_placement(grid, row, column):
     """ Function checks if a particular point on a grid is valid for
         ship section placement.
@@ -188,28 +199,28 @@ def is_valid_placement(grid, row, column):
     if grid.gridState[row][column] != 0:
         return False  
 
-    # Check if Right Side edge.
+    # If right side grid edge, there is no adjacent cell to check.
     if column == grid.size - 1:
         pass
     # Check if adjacent to another ship on the right.
     elif grid.gridState[row][column + 1] != 0:
         return False
 
-    # Check if Left Side edge.
+    # If left side grid edge, there is no adjacent cell to check.
     if column == 0:
         pass
     # Check if adjacent to another ship on the left.
     elif grid.gridState[row][column - 1] != 0:
         return False
  
-    # Check if Bottom Edge.
+    # If bottom grid edge, there is no adjacent cell to check.
     if row == grid.size - 1:
         pass    
     # Check if adjacent to another ship below.
     elif grid.gridState[row + 1][column] != 0:
         return False
     
-    # Check if Top Edge.
+    # If top grid edge, there is no adjacent cell to check.
     if row == 0:
         pass
     # Check if adjacent to another ship above.
@@ -240,7 +251,7 @@ def is_valid_placement(grid, row, column):
         if grid.gridState[row + 1][column - 1] != 0:
             return False
     
-    # All checks have passed. Location is valid.
+    # All checks have passed. Ship placement location is valid.
     return True
 
     
@@ -262,7 +273,11 @@ def is_valid_move(grid, moveTuple):
     return True    
 
 
-def is_adjacent_to_known_ship(grid, moveTuple):
+def is_move_adjacent_to_known_ship(grid, moveTuple):
+    """ Check if a particular move would be adjacent to known ship.
+        This function is used to improve random move generation logic.
+        Since ships can't be adjacent to each other, those cells can be ignored.
+    """
     row, column = moveTuple
     
     # Check if Right Side edge.
@@ -324,11 +339,13 @@ def is_adjacent_to_known_ship(grid, moveTuple):
 def get_random_ship_placement_location(grid, shipLength):
     """ Find random but valid placement location for a ship.
     """
-    # Counter to guard against infinite loops.
+    # Initiating counter to guard against infinite loops in cases where
+    # no valid placement can be found.
     tries = 0
     
     sectionLocationTupleList = []
     
+    # Keep adding sections to equal the ship length.
     while len(sectionLocationTupleList) != shipLength and tries != 100000:
         tries += 1
         sectionLocationTupleList = []
@@ -342,7 +359,7 @@ def get_random_ship_placement_location(grid, shipLength):
         
         # Continue adding sections if needed.
         if shipLength > 1:
-            # Set orientation for the ship.
+            # Set random orientation for the ship.
             randomOrientation = random.randrange(4)
             for i in range(shipLength - 1):
                 
@@ -385,7 +402,7 @@ def main():
     
     # Print Starting Human grid state.
     pprint(humanGrid.gridState)
-           
+
     while len(humanGrid.aliveShipObjectList) != 0:
         if aiBrain.isTargetMode and not aiBrain.isSecondHit:
             print('Getting a pattern move from aiBrain')
