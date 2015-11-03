@@ -5,7 +5,7 @@ from pprint import pprint
 import random
 
 # Size of the playing field grid in units squared.
-GRID_SIZE = 7
+GRID_SIZE = 6
 
 
 class Grid(object):
@@ -88,12 +88,14 @@ class Ship(object):
 class AIMind(object):            
     """ Class that handles AI move logic.
     """
-    def __init__(self, grid):    
+    def __init__(self, grid):        
         self.grid = grid
+        self.aiMoveTuple = None
         self.isTargetMode = False
         self.isSecondHit = False
         self.orientation = None
         self.origHitTuple = None
+        self.hitTuple = None
         self.subsequentHitTuple = None
         
     def provide_random_move(self):
@@ -101,15 +103,15 @@ class AIMind(object):
         """
         row = random.randrange(GRID_SIZE)
         column = random.randrange(GRID_SIZE)
-        aiMoveTuple = (row, column)
+        self.aiMoveTuple = (row, column)
 
         # Look for a valid move if first random location is invalid. 
-        while not is_valid_move(self.grid, aiMoveTuple) or is_move_adjacent_to_known_ship(self.grid, aiMoveTuple):
+        while not is_valid_move(self.grid, self.aiMoveTuple) or is_move_adjacent_to_known_ship(self.grid, self.aiMoveTuple):
             row = random.randrange(GRID_SIZE)
             column = random.randrange(GRID_SIZE)
-            aiMoveTuple = (row, column)
+            self.aiMoveTuple = (row, column)
         
-        return aiMoveTuple     
+        return self.aiMoveTuple     
 
     def provide_pattern_move(self, hitTuple):
         """ Method generates moves adjacent to the last known hit.
@@ -132,14 +134,14 @@ class AIMind(object):
             self.isTargetMode = False
             return self.provide_random_move()
                 
-        aiMoveTuple = (row, column)    
-        return aiMoveTuple        
+        self.aiMoveTuple = (row, column)    
+        return self.aiMoveTuple        
 
-    def provide_targeted_move(self, prevAIMoveTuple):
+    def provide_targeted_move(self, aiMoveTuple):
         """ After there have been multiple hits on same ship,
             this method will provide moves along that axis.
         """
-        row, column = prevAIMoveTuple
+        row, column = self.aiMoveTuple
         origRow, origColumn = self.origHitTuple
         subRow, subColumn = self.subsequentHitTuple
 
@@ -153,35 +155,35 @@ class AIMind(object):
         if self.orientation == 'horizontal':
             # Keep attacking adjacent cells on same axis as long as last move was not a miss.
             if is_valid_move(self.grid, (origRow, subColumn + 1)) and self.grid.gridState[row][column] != 3:
-                aiMoveTuple = (origRow, subColumn + 1)
+                self.aiMoveTuple = (origRow, subColumn + 1)
             
             # Attack cells in different direction starting from
             # original hit point.
             else:
                 origColumn -= 1
                 self.origHitTuple = (origRow, origColumn)
-                aiMoveTuple = self.origHitTuple
+                self.aiMoveTuple = self.origHitTuple
                     
-                while not is_valid_move(self.grid, aiMoveTuple):
+                while not is_valid_move(self.grid, self.aiMoveTuple):
                     origColumn -= 1
                     self.origHitTuple = (origRow, origColumn)
-                    aiMoveTuple = self.origHitTuple
+                    self.aiMoveTuple = self.origHitTuple
                     
         # Same logic as above but for vertical ship orientation.
         elif self.orientation == 'vertical':
             if is_valid_move(self.grid, (subRow + 1, origColumn)) and self.grid.gridState[row][column] != 3:
-                aiMoveTuple = (subRow + 1, origColumn)
+                self.aiMoveTuple = (subRow + 1, origColumn)
             else:
                 origRow -= 1
                 self.origHitTuple = (origRow, origColumn)
-                aiMoveTuple = self.origHitTuple
+                self.aiMoveTuple = self.origHitTuple
 
-                while not is_valid_move(self.grid, aiMoveTuple):
+                while not is_valid_move(self.grid, self.aiMoveTuple):
                     origRow -= 1
                     self.origHitTuple = (origRow, origColumn)
-                    aiMoveTuple = self.origHitTuple
+                    self.aiMoveTuple = self.origHitTuple
 
-        return aiMoveTuple
+        return self.aiMoveTuple
 
 
 def is_valid_placement(grid, row, column):
@@ -389,7 +391,53 @@ def get_random_ship_placement_location(grid, shipLength):
         return []
     return sectionLocationTupleList
 
+def ai_make_a_move(humanGrid, aiBrain):
+    """ Decide on a move from AI based on what is known about the grid
+        state. Update the grid, ship and AI state with the results of the move.
+    """    
+        
+    # If there was a previous hit, switch to attacking adjacent cells.
+    if aiBrain.isTargetMode and not aiBrain.isSecondHit:
+        aiMoveTuple = aiBrain.provide_pattern_move(aiBrain.hitTuple)
+    
+    # If there were two hits, switch to attacking same axis of cells.
+    elif aiBrain.isTargetMode and aiBrain.isSecondHit:       
+        aiMoveTuple = aiBrain.provide_targeted_move(aiBrain.aiMoveTuple)
 
+    # If not in target mode, get a random guess.    
+    else:     
+        aiMoveTuple = aiBrain.provide_random_move()
+    
+    # Check if the move resulted on a hit on any ship objects.
+    for ship in humanGrid.aliveShipObjectList:       
+        # If there was a hit, update grid and state accordingly.
+        if aiMoveTuple in ship.sectionLocationList:
+            if aiBrain.isTargetMode:
+                aiBrain.isSecondHit = True
+                aiBrain.subsequentHitTuple = aiMoveTuple
+            else:
+                aiBrain.origHitTuple = aiMoveTuple
+            
+            row, column = aiMoveTuple
+            print('AI, there was a hit!')
+            print(aiMoveTuple)
+            aiBrain.hitTuple = aiMoveTuple
+            ship.take_damage(aiMoveTuple)
+            aiBrain.isTargetMode = True
+            if not ship.isAlive:
+                print('AI sunk the', ship.name)
+                humanGrid.aliveShipObjectList.remove(ship)
+                aiBrain.isTargetMode = False
+                aiBrain.isSecondHit = False
+                aiBrain.orientation = None
+            humanGrid.gridState[row][column] = 2
+            break
+    # If there were no hits, mark it as a miss on the grid.   
+    else:
+        print('AI Missed!')
+        row, column = aiMoveTuple
+        humanGrid.gridState[row][column] = 3            
+    
 def main():
     # Create a human grid object.
     humanGrid = Grid(GRID_SIZE)
@@ -403,47 +451,12 @@ def main():
     # Print Starting Human grid state.
     pprint(humanGrid.gridState)
 
-    while len(humanGrid.aliveShipObjectList) != 0:
-        if aiBrain.isTargetMode and not aiBrain.isSecondHit:
-            print('Getting a pattern move from aiBrain')
-            aiMoveTuple = aiBrain.provide_pattern_move(hitTuple)
-        elif aiBrain.isTargetMode and aiBrain.isSecondHit:
-            print('Getting a targeted move from aiBrain')
-            aiMoveTuple = aiBrain.provide_targeted_move(aiMoveTuple)
-        else:
-            print('Getting a random move from aiBrain')
-            aiMoveTuple = aiBrain.provide_random_move()
-        
-        for ship in humanGrid.aliveShipObjectList:
-            if aiMoveTuple in ship.sectionLocationList:
-                if aiBrain.isTargetMode:
-                    aiBrain.isSecondHit = True
-                    aiBrain.subsequentHitTuple = aiMoveTuple
-                else:
-                    aiBrain.origHitTuple = aiMoveTuple
-                
-                row, column = aiMoveTuple
-                print('AI, there was a hit!')
-                print(aiMoveTuple)
-                hitTuple = aiMoveTuple
-                ship.take_damage(aiMoveTuple)
-                aiBrain.isTargetMode = True
-                if not ship.isAlive:
-                    print('AI sunk the', ship.name)
-                    humanGrid.aliveShipObjectList.remove(ship)
-                    aiBrain.isTargetMode = False
-                    aiBrain.isSecondHit = False
-                    aiBrain.orientation = None
-                humanGrid.gridState[row][column] = 2
-                break
-            
-        else:
-            print('AI Missed!')
-            row, column = aiMoveTuple
-            humanGrid.gridState[row][column] = 3
+    # Keep the game going while there are any ships alive.
+    while humanGrid.aliveShipObjectList:
+        ai_make_a_move(humanGrid, aiBrain)
 
         print('Human Grid:')
-        print('AI move was:', aiMoveTuple)
+        print('AI move was:', aiBrain.aiMoveTuple)
         pprint(humanGrid.gridState)
         input()
  
