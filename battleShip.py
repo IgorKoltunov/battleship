@@ -261,6 +261,11 @@ def is_valid_move(grid, moveTuple):
     """ Check if a particular move would be valid.
     """
     row, column = moveTuple
+    
+    # Check if row and column are integers.
+    if not isinstance(row, int) or not isinstance(column, int):
+        return False
+    
     # Check if move is outside of grid index range.
     if row < 0 or row > grid.size - 1:
         return False
@@ -437,27 +442,76 @@ def ai_make_a_move(humanGrid, aiBrain):
         print('AI Missed!')
         row, column = aiMoveTuple
         humanGrid.gridState[row][column] = 3            
-    
+
+
+def human_make_a_move(aiGrid):
+  
+    # Validate user's input. 
+    while True:
+        row = input('Give a row number (0-' + str(GRID_SIZE - 1) +'): ')
+        column = input('Give a column number (0-' + str(GRID_SIZE - 1) +'): ')
+        if not row.isdigit() or not column.isdigit():        
+            print('Digits only allowed. Try again.')
+            continue
+        row = int(row)
+        column = int(column)
+        if not is_valid_move(aiGrid, (row, column)):
+            print('That move is invalid. Try again.')
+            continue
+        humanMoveTuple = (row, column)
+        break
+
+    # Check if the move resulted on a hit on any ship objects.
+    for ship in aiGrid.aliveShipObjectList:
+        if humanMoveTuple in ship.sectionLocationList:
+            print('Human, there was a hit!')
+            print(humanMoveTuple)
+            ship.take_damage(humanMoveTuple)
+            if not ship.isAlive:
+                print('Human sunk the', ship.name)
+                aiGrid.aliveShipObjectList.remove(ship)
+            aiGrid.gridState[row][column] = 2
+            break
+    else:
+        print('Human Missed!')
+        aiGrid.gridState[row][column] = 3      
+    return humanMoveTuple
+        
 def main():
     # Create a human grid object.
     humanGrid = Grid(GRID_SIZE)
     
+    # Create an AI grid object.
+    aiGrid = Grid(GRID_SIZE)
+    
     # Populate the human grid with ships.
     humanGrid.populate_grid()
-    
+    aiGrid.populate_grid()
+
     # Create AI Brain object.
-    aiBrain = AIMind(humanGrid)
-    
-    # Print Starting Human grid state.
-    pprint(humanGrid.gridState)
+    aiBrain = AIMind(humanGrid)   
 
     # Keep the game going while there are any ships alive.
-    while humanGrid.aliveShipObjectList:
+    while humanGrid.aliveShipObjectList and aiGrid.aliveShipObjectList:
+        
+        # AI Move
         ai_make_a_move(humanGrid, aiBrain)
-
         print('Human Grid:')
         print('AI move was:', aiBrain.aiMoveTuple)
         pprint(humanGrid.gridState)
-        input()
- 
+        
+        # Human Move
+        humanMoveTuple = human_make_a_move(aiGrid)
+        print('AI Hidden Grid:')
+        print('Human move was:', humanMoveTuple)
+        pprint(aiGrid.get_hidden_grid())
+    
+    # Game result
+    if not humanGrid.aliveShipObjectList:
+        print('AI Won!')
+    elif not aiGrid.aliveShipObjectList:
+        print('Human Won!')
+    else:
+        print('hmm this shouldnt happen')
+    
 main()    
